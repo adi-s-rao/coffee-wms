@@ -367,7 +367,7 @@ body { font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; backg
 
 <script>
 // ── Config ───────────────────────────────────────────────────────────────────
-const SERVER = `${location.protocol}//${location.hostname}:${location.port || 8000}`;
+const SERVER = `${location.protocol}//${location.hostname}${location.port ? ':' + location.port : ''}`;
 
 // ── State ────────────────────────────────────────────────────────────────────
 let currentPO      = null;
