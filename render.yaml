@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: coffee-wms
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn server:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: coffee-wms-db
+          property: connectionString
+
+databases:
+  - name: coffee-wms-db
+    plan: free

@@ -1,0 +1,840 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Coffee WMS</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --green:  #1D9E75; --red: #E24B4A; --amber: #EF9F27;
+  --blue:   #378ADD; --purple: #534AB7;
+  --bg:     #f5f4f0; --card: #ffffff;
+  --text:   #2c2c2a; --muted: #888780;
+  --border: rgba(0,0,0,0.10); --radius: 14px;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg:#1a1a18; --card:#242422; --text:#e8e6de; --muted:#888780; --border:rgba(255,255,255,0.10); }
+}
+body { font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; background:var(--bg); color:var(--text); min-height:100vh; padding-bottom:50px; }
+
+/* Header */
+.hdr { background:var(--card); border-bottom:1px solid var(--border); padding:14px 18px; position:sticky; top:0; z-index:100; }
+.hdr-row { display:flex; align-items:center; justify-content:space-between; }
+.hdr h1 { font-size:16px; font-weight:700; }
+.hdr-sub { font-size:11px; color:var(--muted); margin-top:2px; }
+
+/* Step bar */
+.stepbar { display:flex; padding:10px 18px; gap:6px; background:var(--card); border-bottom:1px solid var(--border); }
+.step-pill { flex:1; text-align:center; font-size:10px; font-weight:600; padding:5px 2px; border-radius:20px; color:var(--muted); background:var(--bg); transition:all .2s; }
+.step-pill.active { background:var(--blue); color:#fff; }
+.step-pill.done   { background:#e1f5ee; color:#0f6e56; }
+
+/* Gate pill */
+.gate-pill { font-size:11px; font-weight:600; padding:4px 10px; border-radius:20px; transition:all .3s; }
+.gate-pill.active { background:#e1f5ee; color:#0f6e56; }
+.gate-pill.alarm  { background:#fcebeb; color:#a32d2d; animation:pulse .4s infinite alternate; }
+.gate-pill.off    { background:#f1efe8; color:#5f5e5a; }
+@keyframes pulse { from{opacity:1} to{opacity:.5} }
+
+/* Screens */
+.screen { display:none; padding:18px; }
+.screen.active { display:block; }
+
+/* Cards */
+.card { background:var(--card); border-radius:var(--radius); border:1px solid var(--border); padding:16px; margin-bottom:12px; }
+.card-title { font-size:12px; font-weight:600; color:var(--muted); text-transform:uppercase; letter-spacing:.5px; margin-bottom:10px; }
+
+/* PO card */
+.po-card { background:var(--card); border-radius:var(--radius); border:1px solid var(--border); padding:16px; margin-bottom:12px; cursor:pointer; transition:transform .15s; }
+.po-card:active { transform:scale(.98); }
+.po-tag { display:inline-block; font-size:11px; font-weight:600; background:#e6f1fb; color:#185fa5; padding:3px 9px; border-radius:20px; margin-bottom:6px; }
+.po-name { font-size:17px; font-weight:700; margin-bottom:3px; }
+.po-meta { font-size:12px; color:var(--muted); }
+.progress-bg { background:var(--bg); border-radius:6px; height:7px; overflow:hidden; margin-top:10px; }
+.progress-fill { height:7px; border-radius:6px; background:var(--green); transition:width .4s; }
+.progress-lbl { font-size:11px; color:var(--muted); margin-top:4px; display:flex; justify-content:space-between; }
+
+/* Buttons */
+.btn { width:100%; padding:15px; border-radius:var(--radius); border:none; font-size:15px; font-weight:600; cursor:pointer; transition:all .15s; margin-bottom:10px; }
+.btn:active { transform:scale(.97); }
+.btn-green  { background:var(--green);  color:#fff; }
+.btn-blue   { background:var(--blue);   color:#fff; }
+.btn-red    { background:var(--red);    color:#fff; }
+.btn-amber  { background:var(--amber);  color:#fff; }
+.btn-ghost  { background:transparent; color:var(--muted); border:1px solid var(--border); }
+.btn-small  { padding:10px; font-size:13px; margin-bottom:8px; }
+.btn:disabled { opacity:.4; cursor:not-allowed; }
+
+/* Stats */
+.stats-row { display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; margin-bottom:12px; }
+.stat-box  { background:var(--card); border-radius:12px; border:1px solid var(--border); padding:12px 8px; text-align:center; }
+.stat-num  { font-size:24px; font-weight:700; }
+.stat-lbl  { font-size:10px; color:var(--muted); margin-top:2px; }
+.stat-box.hi { border-color:var(--green); }
+.stat-box.hi .stat-num { color:var(--green); }
+
+/* Collie / tag list items */
+.list-item { display:flex; align-items:center; gap:10px; padding:11px 0; border-bottom:1px solid var(--border); }
+.list-item:last-child { border-bottom:none; }
+.list-avatar { width:36px; height:36px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:16px; flex-shrink:0; }
+.list-info { flex:1; min-width:0; }
+.list-name { font-size:14px; font-weight:600; }
+.list-sub  { font-size:12px; color:var(--muted); margin-top:1px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.list-action { padding:6px 12px; border-radius:8px; border:1px solid var(--border); background:transparent; color:var(--red); font-size:12px; font-weight:600; cursor:pointer; }
+
+/* Form */
+.form-group { margin-bottom:12px; }
+.form-label { font-size:12px; font-weight:600; color:var(--muted); margin-bottom:5px; display:block; }
+.form-input { width:100%; padding:12px 13px; border-radius:10px; border:1px solid var(--border); background:var(--bg); color:var(--text); font-size:15px; }
+.form-input:focus { outline:none; border-color:var(--blue); }
+.form-row { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+
+/* NFC tap */
+.nfc-tap { background:var(--bg); border:2px dashed var(--border); border-radius:var(--radius); padding:24px 16px; text-align:center; cursor:pointer; transition:all .2s; margin-bottom:12px; }
+.nfc-tap.listening { border-color:var(--blue); background:#e6f1fb22; }
+.nfc-tap.success   { border-color:var(--green); background:#e1f5ee44; }
+.nfc-icon { font-size:32px; margin-bottom:6px; }
+.nfc-text { font-size:14px; font-weight:600; }
+.nfc-sub  { font-size:12px; color:var(--muted); margin-top:3px; }
+
+/* Await card */
+.await-card { background:#faeeda; border:1px solid #fac775; border-radius:var(--radius); padding:16px; margin-bottom:12px; }
+.await-title { font-size:14px; font-weight:700; color:#633806; margin-bottom:4px; }
+.await-uid   { font-size:12px; font-family:monospace; color:#854f0b; margin-bottom:12px; }
+
+/* Alarm */
+.alarm-banner { background:#fcebeb; border:1px solid #f7c1c1; border-radius:var(--radius); padding:14px; margin-bottom:12px; display:none; }
+.alarm-banner.show { display:block; animation:shake .4s ease; }
+.alarm-title { font-size:14px; font-weight:700; color:var(--red); margin-bottom:3px; }
+.alarm-sub   { font-size:12px; color:#a32d2d; }
+@keyframes shake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-6px)} 75%{transform:translateX(6px)} }
+
+/* Bag items */
+.bag-item { display:flex; align-items:center; gap:10px; padding:10px 0; border-bottom:1px solid var(--border); }
+.bag-item:last-child { border-bottom:none; }
+.bag-dot { width:9px; height:9px; border-radius:50%; flex-shrink:0; }
+.bag-dot.pending  { background:#d3d1c7; }
+.bag-dot.scanned  { background:var(--amber); }
+.bag-dot.inwarded { background:var(--green); }
+.bag-info { flex:1; }
+.bag-uid  { font-size:13px; font-weight:600; }
+.bag-sub  { font-size:11px; color:var(--muted); margin-top:1px; }
+.bag-wt   { font-size:14px; font-weight:700; color:var(--green); }
+
+/* Success */
+.success-card { background:#e1f5ee; border:1px solid #9fe1cb; border-radius:var(--radius); padding:20px; text-align:center; margin-bottom:12px; }
+.success-icon  { font-size:38px; margin-bottom:6px; }
+.success-title { font-size:16px; font-weight:700; color:#0f6e56; margin-bottom:3px; }
+.success-sub   { font-size:13px; color:#1d9e75; }
+
+/* Toast */
+.toast { position:fixed; bottom:24px; left:50%; transform:translateX(-50%) translateY(80px); background:#2c2c2a; color:#fff; padding:11px 20px; border-radius:24px; font-size:13px; font-weight:600; z-index:999; transition:transform .3s ease; white-space:nowrap; max-width:90vw; text-align:center; }
+.toast.show { transform:translateX(-50%) translateY(0); }
+
+.divider { height:1px; background:var(--border); margin:14px 0; }
+.section-title { font-size:12px; font-weight:600; color:var(--muted); text-transform:uppercase; letter-spacing:.5px; margin-bottom:10px; }
+.net-preview { padding:10px 12px; background:var(--bg); border-radius:10px; margin-bottom:12px; font-size:13px; color:var(--muted); }
+.tag-uid-mono { font-family:monospace; font-size:11px; color:var(--muted); }
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<div class="hdr">
+  <div class="hdr-row">
+    <div>
+      <h1>☕ Coffee WMS</h1>
+      <div class="hdr-sub" id="hdr-sub">Warehouse handheld</div>
+    </div>
+    <span class="gate-pill off" id="gate-pill">Gate OFF</span>
+  </div>
+</div>
+
+<!-- Step bar (hidden on job list) -->
+<div class="stepbar" id="stepbar" style="display:none;">
+  <div class="step-pill" id="step1">1 · Collies</div>
+  <div class="step-pill" id="step2">2 · Sack tags</div>
+  <div class="step-pill" id="step3">3 · Inward</div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- ════════════════════════════════════════ -->
+<!--  SCREEN: Job list                        -->
+<!-- ════════════════════════════════════════ -->
+<div class="screen active" id="s-joblist">
+  <div class="section-title">Today's job list</div>
+  <div id="po-list"><div class="card" style="text-align:center;color:var(--muted);padding:30px;">Loading…</div></div>
+  <div class="divider"></div>
+  <button class="btn btn-ghost btn-small" onclick="showScreen('s-write-wristband')">💳 Write wristband card</button>
+  <button class="btn btn-ghost btn-small" onclick="resetDemo()">🔄 Reset demo data</button>
+</div>
+
+<!-- ════════════════════════════════════════ -->
+<!--  SCREEN: Step 1 — Register collies       -->
+<!-- ════════════════════════════════════════ -->
+<div class="screen" id="s-collies">
+  <div class="card">
+    <div class="card-title">Step 1 — Register collies for this session</div>
+    <p style="font-size:13px;color:var(--muted);margin-bottom:14px;">Add each collie who will carry sacks. Their weight is used to calculate net bag weight.</p>
+
+    <!-- Add collie form -->
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Collie name</label>
+        <input class="form-input" id="c-name" type="text" placeholder="e.g. Ramu">
+      </div>
+      <div class="form-group">
+        <label class="form-label">ID</label>
+        <input class="form-input" id="c-id" type="text" placeholder="C-01">
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Body weight (kg)</label>
+      <input class="form-input" id="c-wt" type="number" step="0.1" placeholder="e.g. 65">
+    </div>
+    <button class="btn btn-blue btn-small" onclick="addCollie()">+ Add collie</button>
+  </div>
+
+  <!-- Collie list -->
+  <div class="card">
+    <div class="card-title">Registered collies</div>
+    <div id="collie-list"><div style="color:var(--muted);font-size:13px;text-align:center;padding:16px 0;">No collies added yet</div></div>
+  </div>
+
+  <button class="btn btn-green" id="btn-to-step2" onclick="goToStep2()" disabled>Next → Register sack tags</button>
+  <button class="btn btn-ghost" onclick="goToJobList()">← Back</button>
+</div>
+
+<!-- ════════════════════════════════════════ -->
+<!--  SCREEN: Step 2 — Register sack tags     -->
+<!-- ════════════════════════════════════════ -->
+<div class="screen" id="s-sacks">
+  <div class="card">
+    <div class="card-title">Step 2 — Register sack tags</div>
+    <p style="font-size:13px;color:var(--muted);margin-bottom:14px;">
+      Tap each NFC sticker to your phone to read its UID, then give it a human-readable label like SACK-001. The UID is permanent and cannot be changed.
+    </p>
+
+    <!-- NFC tap to read UID -->
+    <div class="nfc-tap" id="sack-nfc-tap" onclick="scanSackTag()">
+      <div class="nfc-icon">🏷️</div>
+      <div class="nfc-text">Tap a sack sticker to phone</div>
+      <div class="nfc-sub">Reads the permanent UID from the tag</div>
+    </div>
+
+    <!-- Manual UID entry fallback -->
+    <div id="sack-form" style="display:none;">
+      <div class="form-group">
+        <label class="form-label">Tag UID <span class="tag-uid-mono" id="sack-uid-display"></span></label>
+        <input class="form-input" id="sack-uid" type="text" placeholder="or type UID manually e.g. A3:F2:09:B1" style="font-family:monospace;">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Label (permanent ID for this tag)</label>
+        <input class="form-input" id="sack-label" type="text" placeholder="e.g. SACK-001">
+      </div>
+      <button class="btn btn-blue btn-small" onclick="saveSackTag()">+ Register tag</button>
+      <button class="btn btn-ghost btn-small" onclick="resetSackForm()">Cancel</button>
+    </div>
+  </div>
+
+  <!-- Registered tags -->
+  <div class="card">
+    <div class="card-title">Registered sack tags</div>
+    <div id="sack-tag-list"><div style="color:var(--muted);font-size:13px;text-align:center;padding:16px 0;">No tags registered yet</div></div>
+  </div>
+
+  <button class="btn btn-green" id="btn-to-step3" onclick="goToStep3()">Next → Start inwarding</button>
+  <button class="btn btn-ghost" onclick="showStep(1)">← Back to collies</button>
+</div>
+
+<!-- ════════════════════════════════════════ -->
+<!--  SCREEN: Step 3 — Inwarding              -->
+<!-- ════════════════════════════════════════ -->
+<div class="screen" id="s-inwarding">
+
+  <div class="alarm-banner" id="alarm-banner">
+    <div class="alarm-title">🚨 Alarm — Duplicate bag!</div>
+    <div class="alarm-sub" id="alarm-sub">This tag has already been inwarded.</div>
+  </div>
+
+  <div class="stats-row">
+    <div class="stat-box hi">
+      <div class="stat-num" id="stat-inwarded">0</div>
+      <div class="stat-lbl">Inwarded</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-num" id="stat-total">—</div>
+      <div class="stat-lbl">Total bags</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-num" id="stat-kg">0</div>
+      <div class="stat-lbl">Kg logged</div>
+    </div>
+  </div>
+
+  <div class="card" style="padding:12px 16px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+      <span style="font-size:13px;font-weight:600;" id="po-title-inline">—</span>
+      <span style="font-size:12px;color:var(--muted);" id="progress-pct">0%</span>
+    </div>
+    <div class="progress-bg"><div class="progress-fill" id="progress-bar" style="width:0%"></div></div>
+  </div>
+
+  <!-- Awaiting wristband -->
+  <div class="await-card" id="await-section" style="display:none;">
+    <div class="await-title">📡 Bag scanned — select collie & enter weight</div>
+    <div class="await-uid" id="await-uid-label">—</div>
+
+    <!-- Collie selector -->
+    <div class="form-group">
+      <label class="form-label">Select collie carrying this bag</label>
+      <select class="form-input" id="collie-select">
+        <option value="">— choose collie —</option>
+      </select>
+    </div>
+
+    <!-- Or scan wristband via NFC -->
+    <div class="nfc-tap" id="wristband-nfc-tap" onclick="scanWristband()" style="padding:14px;">
+      <div class="nfc-icon" style="font-size:24px;">💳</div>
+      <div class="nfc-text" style="font-size:13px;">Or tap wristband card to auto-fill</div>
+      <div class="nfc-sub">Hold NFC card to back of phone</div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Gross weight on scale (kg)</label>
+      <input class="form-input" id="gross-wt" type="number" step="0.1" placeholder="e.g. 125">
+    </div>
+    <div class="net-preview">Net bag weight = gross − collie = <strong id="net-preview" style="color:var(--green);">—</strong></div>
+    <button class="btn btn-green btn-small" onclick="submitBag()">✅ Log this bag</button>
+    <button class="btn btn-ghost btn-small" onclick="cancelAwait()">Cancel</button>
+  </div>
+
+  <!-- Bag list -->
+  <div class="card">
+    <div class="card-title">Bags this session</div>
+    <div id="bag-list"><div style="color:var(--muted);font-size:13px;text-align:center;padding:16px 0;">Bring a sack through the gate to begin</div></div>
+  </div>
+
+  <button class="btn btn-green" id="btn-complete" onclick="completeInwarding()" disabled>✅ Complete inwarding</button>
+  <button class="btn btn-ghost" onclick="goToJobList()">← Back to job list</button>
+</div>
+
+<!-- ════════════════════════════════════════ -->
+<!--  SCREEN: Complete                        -->
+<!-- ════════════════════════════════════════ -->
+<div class="screen" id="s-complete">
+  <div class="success-card">
+    <div class="success-icon">✅</div>
+    <div class="success-title">Inwarding Complete!</div>
+    <div class="success-sub" id="complete-summary">All bags logged.</div>
+  </div>
+  <div class="card" id="complete-detail"></div>
+  <button class="btn btn-blue" onclick="goToJobList()">← Back to job list</button>
+</div>
+
+<!-- ════════════════════════════════════════ -->
+<!--  SCREEN: Write wristband                 -->
+<!-- ════════════════════════════════════════ -->
+<div class="screen" id="s-write-wristband">
+  <div class="card">
+    <div class="card-title">Write wristband card</div>
+    <p style="font-size:13px;color:var(--muted);margin-bottom:14px;">Write collie info onto an NFC card so it can be tapped to the phone during inwarding.</p>
+    <div class="form-group">
+      <label class="form-label">Collie name</label>
+      <input class="form-input" id="wb-name" type="text" placeholder="e.g. Ramu">
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Collie ID</label>
+        <input class="form-input" id="wb-id" type="text" placeholder="C-01">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Body weight (kg)</label>
+        <input class="form-input" id="wb-wt" type="number" step="0.1" placeholder="65">
+      </div>
+    </div>
+    <div class="nfc-tap" id="wb-tap" onclick="writeWristband()">
+      <div class="nfc-icon">✍️</div>
+      <div class="nfc-text">Tap to write wristband</div>
+      <div class="nfc-sub">Hold NFC card to phone then tap here</div>
+    </div>
+    <div id="wb-status" style="font-size:13px;color:var(--muted);text-align:center;"></div>
+  </div>
+  <button class="btn btn-ghost" onclick="goToJobList()">← Back</button>
+</div>
+
+<script>
+// ── Config ───────────────────────────────────────────────────────────────────
+const SERVER = `${location.protocol}//${location.hostname}:${location.port || 8000}`;
+
+// ── State ────────────────────────────────────────────────────────────────────
+let currentPO      = null;
+let pendingTagUID  = null;
+let pendingTagLbl  = null;
+let pollInterval   = null;
+let lastAlarm      = false;
+let collies        = [];
+
+// ── Utilities ────────────────────────────────────────────────────────────────
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+function showStep(n) {
+  document.getElementById('stepbar').style.display = 'flex';
+  [1,2,3].forEach(i => {
+    const el = document.getElementById(`step${i}`);
+    el.className = 'step-pill' + (i < n ? ' done' : i === n ? ' active' : '');
+  });
+  showScreen(['','s-collies','s-sacks','s-inwarding'][n]);
+}
+
+function toast(msg, ms=2500) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), ms);
+}
+
+function updateNetPreview() {
+  const sel    = document.getElementById('collie-select');
+  const gross  = parseFloat(document.getElementById('gross-wt').value) || 0;
+  const collie = sel.value ? collies.find(c => c.id === sel.value) : null;
+  const cwt    = collie ? collie.weight : 0;
+  document.getElementById('net-preview').textContent =
+    (gross && cwt) ? `${(gross - cwt).toFixed(2)} kg` : '—';
+}
+document.getElementById('collie-select').addEventListener('change', updateNetPreview);
+document.getElementById('gross-wt').addEventListener('input', updateNetPreview);
+
+// ── Job list ─────────────────────────────────────────────────────────────────
+async function loadJobList() {
+  try {
+    const pos  = await (await fetch(`${SERVER}/api/purchase-orders`)).json();
+    const list = document.getElementById('po-list');
+    if (!pos.length) {
+      list.innerHTML = `<div class="card" style="text-align:center;color:var(--muted);padding:30px;">No purchase orders</div>`; return;
+    }
+    list.innerHTML = pos.map(po => {
+      const pct   = po.total_bags ? Math.round((po.inwarded_bags / po.total_bags) * 100) : 0;
+      const done  = po.status === 'inwarded';
+      return `<div class="po-card" onclick="openPO('${po.id}')">
+        <span class="po-tag">${po.id}</span>
+        <div class="po-name">${po.coffee_type}</div>
+        <div class="po-meta">${po.total_bags} bags · ${po.total_kg} kg expected</div>
+        <div class="progress-bg"><div class="progress-fill" style="width:${pct}%;background:${done?'var(--green)':'var(--blue)'}"></div></div>
+        <div class="progress-lbl"><span>${po.inwarded_bags}/${po.total_bags} bags</span><span>${po.inwarded_kg.toFixed(1)} kg</span></div>
+        <div style="margin-top:10px;font-size:12px;font-weight:600;color:${done?'var(--green)':'var(--blue)'};">
+          ${done ? '✓ Complete' : 'Tap to start inwarding →'}
+        </div>
+      </div>`;
+    }).join('');
+  } catch(e) {
+    document.getElementById('po-list').innerHTML =
+      `<div class="card" style="color:var(--red);">Cannot reach server — is it running?</div>`;
+  }
+}
+
+function goToJobList() {
+  stopPolling();
+  currentPO = null; pendingTagUID = null;
+  document.getElementById('stepbar').style.display = 'none';
+  document.getElementById('hdr-sub').textContent = 'Warehouse handheld';
+  document.getElementById('gate-pill').className = 'gate-pill off';
+  document.getElementById('gate-pill').textContent = 'Gate OFF';
+  showScreen('s-joblist');
+  loadJobList();
+}
+
+function openPO(poId) {
+  currentPO = poId;
+  document.getElementById('hdr-sub').textContent = `Inwarding — ${poId}`;
+  loadCollies();
+  showStep(1);
+}
+
+// ── Step 1: Collies ───────────────────────────────────────────────────────────
+async function loadCollies() {
+  collies = await (await fetch(`${SERVER}/api/collies`)).json();
+  renderCollieList();
+  document.getElementById('btn-to-step2').disabled = collies.length === 0;
+}
+
+function renderCollieList() {
+  const el = document.getElementById('collie-list');
+  if (!collies.length) {
+    el.innerHTML = `<div style="color:var(--muted);font-size:13px;text-align:center;padding:16px 0;">No collies added yet</div>`; return;
+  }
+  el.innerHTML = collies.map(c => `
+    <div class="list-item">
+      <div class="list-avatar" style="background:#e1f5ee;">👷</div>
+      <div class="list-info">
+        <div class="list-name">${c.name}</div>
+        <div class="list-sub">${c.id} · ${c.weight} kg${c.wristband_uid ? ' · 💳 wristband set' : ''}</div>
+      </div>
+      <button class="list-action" onclick="deleteCollie('${c.id}')">Remove</button>
+    </div>`).join('');
+  document.getElementById('btn-to-step2').disabled = false;
+}
+
+async function addCollie() {
+  const name = document.getElementById('c-name').value.trim();
+  const id   = document.getElementById('c-id').value.trim();
+  const wt   = parseFloat(document.getElementById('c-wt').value);
+  if (!name || !id || isNaN(wt)) { toast('Fill in all collie fields'); return; }
+
+  await fetch(`${SERVER}/api/collies`, {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ id, name, weight: wt, wristband_uid: null })
+  });
+  document.getElementById('c-name').value = '';
+  document.getElementById('c-id').value   = '';
+  document.getElementById('c-wt').value   = '';
+  toast(`✓ ${name} registered`);
+  loadCollies();
+}
+
+async function deleteCollie(id) {
+  await fetch(`${SERVER}/api/collies/${id}`, { method:'DELETE' });
+  loadCollies();
+}
+
+function goToStep2() {
+  if (!collies.length) { toast('Add at least one collie first'); return; }
+  loadSackTags();
+  showStep(2);
+}
+
+// ── Step 2: Sack tags ─────────────────────────────────────────────────────────
+let sackTags = [];
+
+async function loadSackTags() {
+  sackTags = await (await fetch(`${SERVER}/api/sack-tags`)).json();
+  renderSackTagList();
+}
+
+function renderSackTagList() {
+  const el = document.getElementById('sack-tag-list');
+  if (!sackTags.length) {
+    el.innerHTML = `<div style="color:var(--muted);font-size:13px;text-align:center;padding:16px 0;">No tags registered yet</div>`; return;
+  }
+  el.innerHTML = sackTags.map(t => `
+    <div class="list-item">
+      <div class="list-avatar" style="background:#e6f1fb;">🏷️</div>
+      <div class="list-info">
+        <div class="list-name">${t.label}</div>
+        <div class="list-sub tag-uid-mono">${t.uid}</div>
+      </div>
+      <button class="list-action" onclick="deleteSackTag('${t.uid}')">Remove</button>
+    </div>`).join('');
+}
+
+async function scanSackTag() {
+  const tap = document.getElementById('sack-nfc-tap');
+
+  if (!('NDEFReader' in window)) {
+    // Fallback — show manual form
+    document.getElementById('sack-uid-display').textContent = '';
+    document.getElementById('sack-uid').value = '';
+    document.getElementById('sack-label').value = '';
+    tap.style.display = 'none';
+    document.getElementById('sack-form').style.display = 'block';
+    return;
+  }
+
+  tap.className = 'nfc-tap listening';
+  tap.querySelector('.nfc-text').textContent = 'Listening — tap sticker to phone…';
+
+  try {
+    const reader = new NDEFReader();
+    await reader.scan();
+    reader.onreading = (e) => {
+      // The UID comes from the serial number of the NFC tag
+      const uid = e.serialNumber.toUpperCase().replace(/:/g,'').match(/.{2}/g).join(':');
+      tap.className = 'nfc-tap success';
+      tap.querySelector('.nfc-text').textContent = `✓ UID read: ${uid}`;
+      tap.style.display = 'none';
+      document.getElementById('sack-uid').value = uid;
+      document.getElementById('sack-uid-display').textContent = uid;
+      // Auto-suggest label
+      const nextNum = sackTags.length + 1;
+      document.getElementById('sack-label').value = `SACK-${String(nextNum).padStart(3,'0')}`;
+      document.getElementById('sack-form').style.display = 'block';
+    };
+  } catch(e) {
+    tap.className = 'nfc-tap';
+    tap.querySelector('.nfc-text').textContent = 'Tap a sack sticker to phone';
+    toast('NFC scan failed — enter UID manually');
+    tap.style.display = 'none';
+    document.getElementById('sack-form').style.display = 'block';
+  }
+}
+
+async function saveSackTag() {
+  const uid   = document.getElementById('sack-uid').value.trim().toUpperCase();
+  const label = document.getElementById('sack-label').value.trim();
+  if (!uid || !label) { toast('Both UID and label are required'); return; }
+
+  const res = await fetch(`${SERVER}/api/sack-tags`, {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ uid, label })
+  });
+  const data = await res.json();
+  toast(`✓ ${label} registered`);
+  resetSackForm();
+  loadSackTags();
+}
+
+async function deleteSackTag(uid) {
+  await fetch(`${SERVER}/api/sack-tags/${uid}`, { method:'DELETE' });
+  loadSackTags();
+}
+
+function resetSackForm() {
+  document.getElementById('sack-form').style.display    = 'none';
+  document.getElementById('sack-nfc-tap').style.display = 'block';
+  document.getElementById('sack-nfc-tap').className     = 'nfc-tap';
+  document.getElementById('sack-nfc-tap').querySelector('.nfc-text').textContent = 'Tap a sack sticker to phone';
+  document.getElementById('sack-uid').value   = '';
+  document.getElementById('sack-label').value = '';
+}
+
+async function goToStep3() {
+  // Activate gate
+  try {
+    await fetch(`${SERVER}/api/start-inwarding`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ po_id: currentPO })
+    });
+  } catch(e) {}
+
+  document.getElementById('po-title-inline').textContent = currentPO;
+  populateCollieSelect();
+  showStep(3);
+  await refreshStatus();
+  startPolling();
+  toast('Gate activated — bring sacks through ✓');
+}
+
+function populateCollieSelect() {
+  const sel = document.getElementById('collie-select');
+  sel.innerHTML = `<option value="">— choose collie —</option>` +
+    collies.map(c => `<option value="${c.id}">${c.name} (${c.weight} kg)</option>`).join('');
+}
+
+// ── Step 3: Inwarding ─────────────────────────────────────────────────────────
+function startPolling() {
+  stopPolling();
+  pollInterval = setInterval(refreshStatus, 1500);
+}
+function stopPolling() {
+  if (pollInterval) { clearInterval(pollInterval); pollInterval = null; }
+}
+
+async function refreshStatus() {
+  if (!currentPO) return;
+  try {
+    const data = await (await fetch(`${SERVER}/api/inwarding-status/${currentPO}`)).json();
+    renderStatus(data);
+  } catch(e) {}
+}
+
+function renderStatus(data) {
+  const { po, bags, gate, inwarded_kg, scanned_bags } = data;
+  const inwarded = bags.filter(b => b.status === 'inwarded').length;
+  const total    = po.total_bags;
+  const pct      = total ? Math.round((inwarded / total) * 100) : 0;
+
+  document.getElementById('stat-inwarded').textContent = inwarded;
+  document.getElementById('stat-total').textContent    = total;
+  document.getElementById('stat-kg').textContent       = inwarded_kg.toFixed(1);
+  document.getElementById('progress-bar').style.width  = pct + '%';
+  document.getElementById('progress-pct').textContent  = pct + '%';
+
+  // Gate pill
+  const pill    = document.getElementById('gate-pill');
+  const isAlarm = gate.command === 'alarm';
+  const isActive= gate.active;
+  if (isAlarm)       { pill.className = 'gate-pill alarm';  pill.textContent = '🚨 ALARM'; }
+  else if (isActive) { pill.className = 'gate-pill active'; pill.textContent = '● Gate LIVE'; }
+  else               { pill.className = 'gate-pill off';    pill.textContent = 'Gate OFF'; }
+
+  // Alarm banner
+  const banner = document.getElementById('alarm-banner');
+  if (isAlarm && !lastAlarm) {
+    banner.classList.add('show');
+    setTimeout(() => banner.classList.remove('show'), 5000);
+  }
+  lastAlarm = isAlarm;
+
+  // Awaiting wristband
+  if (scanned_bags.length > 0 && !pendingTagUID) {
+    const b = scanned_bags[0];
+    pendingTagUID = b.tag_uid;
+    pendingTagLbl = b.tag_label || b.tag_uid;
+    showAwait(pendingTagLbl, pendingTagUID);
+  } else if (scanned_bags.length === 0 && pendingTagUID) {
+    pendingTagUID = null;
+    document.getElementById('await-section').style.display = 'none';
+  }
+
+  // Bag list
+  const listEl   = document.getElementById('bag-list');
+  const withTags = bags.filter(b => b.tag_uid);
+  listEl.innerHTML = withTags.length ? withTags.map(b => `
+    <div class="bag-item">
+      <div class="bag-dot ${b.status}"></div>
+      <div class="bag-info">
+        <div class="bag-uid">${b.tag_label || b.tag_uid}</div>
+        <div class="bag-sub">${
+          b.status === 'inwarded' ? `${b.collie_name} · gross ${b.gross_wt}kg − ${b.collie_wt}kg`
+          : b.status === 'scanned' ? 'Waiting for collie + weight…'
+          : 'Pending'}</div>
+      </div>
+      ${b.net_wt ? `<div class="bag-wt">${b.net_wt.toFixed(1)}kg</div>` : ''}
+    </div>`).join('')
+    : `<div style="color:var(--muted);font-size:13px;text-align:center;padding:16px 0;">Bring a sack through the gate to begin</div>`;
+
+  document.getElementById('btn-complete').disabled = (inwarded < total);
+}
+
+function showAwait(label, uid) {
+  document.getElementById('await-section').style.display = 'block';
+  document.getElementById('await-uid-label').textContent = `Tag: ${label} — ${uid}`;
+  document.getElementById('gross-wt').value = '';
+  document.getElementById('net-preview').textContent = '—';
+  document.getElementById('collie-select').value = '';
+}
+
+async function scanWristband() {
+  if (!('NDEFReader' in window)) { toast('Web NFC not available — select collie from list'); return; }
+  const tap = document.getElementById('wristband-nfc-tap');
+  tap.className = 'nfc-tap listening';
+  tap.querySelector('.nfc-text').textContent = 'Listening — hold card to phone…';
+
+  try {
+    const reader = new NDEFReader();
+    await reader.scan();
+    reader.onreading = (e) => {
+      for (const rec of e.message.records) {
+        if (rec.recordType === 'text') {
+          try {
+            const c = JSON.parse(new TextDecoder().decode(rec.data));
+            document.getElementById('collie-select').value = c.id;
+            tap.className = 'nfc-tap success';
+            tap.querySelector('.nfc-text').textContent = `✓ ${c.name} — ${c.wt}kg`;
+            updateNetPreview();
+            toast(`Wristband read: ${c.name}`);
+          } catch(e) { toast('Could not parse wristband data'); }
+        }
+      }
+    };
+  } catch(e) {
+    tap.className = 'nfc-tap';
+    tap.querySelector('.nfc-text').textContent = 'Or tap wristband card to auto-fill';
+    toast('NFC failed — select collie from list above');
+  }
+}
+
+async function submitBag() {
+  const sel      = document.getElementById('collie-select');
+  const grossWt  = parseFloat(document.getElementById('gross-wt').value);
+  const collie   = collies.find(c => c.id === sel.value);
+
+  if (!collie)         { toast('Select a collie first');                      return; }
+  if (isNaN(grossWt))  { toast('Enter gross weight');                         return; }
+  if (grossWt <= collie.weight) { toast('Gross weight must exceed collie weight'); return; }
+
+  try {
+    const res  = await fetch(`${SERVER}/api/wristband-scan`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        po_id: currentPO, tag_uid: pendingTagUID,
+        collie_id: collie.id, collie_name: collie.name,
+        collie_wt: collie.weight, gross_wt: grossWt
+      })
+    });
+    const data = await res.json();
+    if (res.ok) {
+      toast(`✓ ${pendingTagLbl} logged — net ${data.net_wt} kg`);
+      pendingTagUID = null; pendingTagLbl = null;
+      document.getElementById('await-section').style.display = 'none';
+      await refreshStatus();
+      if (data.complete) { toast('🎉 All bags inwarded!', 3000); }
+    } else { toast('Error: ' + (data.detail || 'Unknown')); }
+  } catch(e) { toast('Server error'); }
+}
+
+function cancelAwait() {
+  pendingTagUID = null;
+  document.getElementById('await-section').style.display = 'none';
+}
+
+async function completeInwarding() {
+  const statusData = await (await fetch(`${SERVER}/api/inwarding-status/${currentPO}`)).json();
+  await fetch(`${SERVER}/api/complete-inwarding`, {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ po_id: currentPO })
+  });
+  stopPolling();
+  const bags = statusData.bags.filter(b => b.status === 'inwarded');
+  document.getElementById('complete-summary').textContent =
+    `${bags.length} bags · ${statusData.inwarded_kg.toFixed(1)} kg total`;
+  document.getElementById('complete-detail').innerHTML = `
+    <div class="card-title">Summary — ${currentPO}</div>
+    ${bags.map(b => `
+      <div class="bag-item">
+        <div class="bag-dot inwarded"></div>
+        <div class="bag-info">
+          <div class="bag-uid">${b.tag_label || b.tag_uid}</div>
+          <div class="bag-sub">${b.collie_name} · ${b.gross_wt}kg − ${b.collie_wt}kg</div>
+        </div>
+        <div class="bag-wt">${b.net_wt.toFixed(1)}kg</div>
+      </div>`).join('')}
+    <div class="divider"></div>
+    <div style="display:flex;justify-content:space-between;font-weight:700;font-size:15px;">
+      <span>Total</span>
+      <span style="color:var(--green);">${statusData.inwarded_kg.toFixed(1)} kg</span>
+    </div>`;
+  document.getElementById('stepbar').style.display = 'none';
+  showScreen('s-complete');
+}
+
+// ── Write wristband ───────────────────────────────────────────────────────────
+async function writeWristband() {
+  const name = document.getElementById('wb-name').value.trim();
+  const id   = document.getElementById('wb-id').value.trim();
+  const wt   = parseFloat(document.getElementById('wb-wt').value);
+  if (!name || !id || isNaN(wt)) { toast('Fill in all fields'); return; }
+  if (!('NDEFReader' in window)) { toast('Web NFC not available on this browser'); return; }
+
+  const statusEl = document.getElementById('wb-status');
+  statusEl.textContent = 'Hold NFC card to phone…';
+  try {
+    const writer = new NDEFReader();
+    await writer.write({ records: [{ recordType:'text', data: JSON.stringify({ name, id, wt }) }] });
+    statusEl.textContent = '';
+    toast(`✓ Wristband written for ${name}`);
+    document.getElementById('wb-tap').className = 'nfc-tap success';
+    document.getElementById('wb-tap').querySelector('.nfc-text').textContent = `✓ Written — ${name}`;
+  } catch(e) {
+    statusEl.textContent = '';
+    toast('Write failed — hold card closer and try again');
+  }
+}
+
+async function resetDemo() {
+  if (!confirm('Reset all demo data?')) return;
+  await fetch(`${SERVER}/api/reset`, { method:'POST' });
+  toast('Demo reset');
+  loadJobList();
+}
+
+// ── Boot ──────────────────────────────────────────────────────────────────────
+loadJobList();
+</script>
+</body>
+</html>
