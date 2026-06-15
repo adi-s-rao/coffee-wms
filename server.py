@@ -13,10 +13,6 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from typing import Optional
-from dotenv import load_dotenv
-
-load_dotenv()
-
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///wms.db")
 USE_POSTGRES  = DATABASE_URL.startswith("postgresql") or DATABASE_URL.startswith("postgres")
 
@@ -180,20 +176,23 @@ ON CONFLICT (id) DO NOTHING;
 
 def init_db():
     conn, kind = get_db()
-    cur = conn.cursor()
     schema = SCHEMA_PG if USE_POSTGRES else SCHEMA_SQLITE
     if USE_POSTGRES:
+        cur = conn.cursor()
         for stmt in [s.strip() for s in schema.split(";") if s.strip()]:
             cur.execute(stmt)
+        conn.commit()
     else:
         conn.executescript(schema)
-    conn.commit()
+        conn.commit()
 
-    # Seed demo PO
+    # Fresh cursor after schema creation (required for SQLite after executescript)
+    cur = conn.cursor()
     p = ph()
     cur.execute(f"SELECT COUNT(*) FROM purchase_orders WHERE id = {p}", ("PO-001",))
     row = cur.fetchone()
-    count = row[0] if isinstance(row, (list, tuple)) else list(row.values())[0]
+    # row[0] works for both psycopg2 tuples and sqlite3.Row objects
+    count = row[0]
     if count == 0:
         cur.execute(f"""
             INSERT INTO purchase_orders (id, coffee_type, total_bags, total_kg, status)
